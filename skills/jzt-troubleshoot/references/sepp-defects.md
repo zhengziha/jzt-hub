@@ -1,0 +1,1 @@
+../../../../my-mcp/jzt-sepp-mcp-server/skills/sepp-defects/SKILL.md

@@ -1,0 +1,73 @@
+#!/bin/bash
+# jzt-hub skills 项目级安装脚本
+# 把 jzt-hub 的 skills 以软链方式安装到目标项目的各 AI IDE skills 目录。
+# 软链指向本仓库，jzt-hub 更新后所有项目自动生效。
+#
+# 用法:
+#   ./link.sh /path/to/target-project <ide...|all> [--agents]
+#
+#   ide       IDE 简称: trae | cursor | claude | qoder，可传多个
+#   all       安装到全部 IDE 目录
+#   --agents  同时在项目 AGENTS.md 追加 skills 索引（供 Codex 等
+#             不支持 skills 目录、但会读 AGENTS.md 的 agent 使用）
+set -euo pipefail
+
+HUB_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILLS_DIR="$HUB_DIR/skills"
+TARGET="${1:?用法: $0 /path/to/target-project [--agents]}"
+TARGET="$(cd "$TARGET" && pwd)"
+AGENTS=0
+[ "${2:-}" = "--agents" ] && AGENTS=1
+
+# IDE 名称 -> 项目级 skills 目录（按需增删）
+IDE_SKILL_DIRS=(
+  ".trae/skills"     # Trae
+  ".cursor/skills"   # Cursor
+  ".claude/skills"   # Claude Code
+  ".qoder/skills"    # Qoder
+)
+
+echo "目标项目: $TARGET"
+for skill in "$SKILLS_DIR"/*/; do
+  name="$(basename "$skill")"
+  for dir in "${IDE_SKILL_DIRS[@]}"; do
+    dest_dir="$TARGET/$dir"
+    dest="$dest_dir/$name"
+    mkdir -p "$dest_dir"
+    if [ -L "$dest" ]; then
+      rm "$dest"
+      ln -s "$SKILLS_DIR/$name" "$dest"
+      echo "  更新软链: $dir/$name"
+    elif [ -e "$dest" ]; then
+      echo "  跳过(已存在同名非软链文件): $dir/$name"
+    else
+      ln -s "$SKILLS_DIR/$name" "$dest"
+      echo "  新建软链: $dir/$name"
+    fi
+  done
+done
+
+if [ "$AGENTS" = "1" ]; then
+  agents_file="$TARGET/AGENTS.md"
+  marker="<!-- jzt-hub-skills -->"
+  if [ -f "$agents_file" ] && grep -q "$marker" "$agents_file"; then
+    echo "  AGENTS.md 已包含索引，跳过"
+  else
+    {
+      echo ""
+      echo "$marker"
+      echo "## JZT MCP Skills"
+      echo ""
+      echo "处理以下任务时，先阅读对应 SKILL.md（软链于 .trae/skills/，任选其一）："
+      echo ""
+      echo "- [.trae/skills/jzt-mcp-overview/SKILL.md](.trae/skills/jzt-mcp-overview/SKILL.md) — 5 个 JZT MCP(ELK/SkyWalking/jztsql/Confluence/SEPP)的能力地图与问题路由"
+      echo "- [.trae/skills/jzt-troubleshoot/SKILL.md](.trae/skills/jzt-troubleshoot/SKILL.md) — 线上故障排查工作流(链路+日志+数据+缺陷)"
+      echo "- [.trae/skills/jzt-sql-optimize/SKILL.md](.trae/skills/jzt-sql-optimize/SKILL.md) — 慢 SQL 定位与优化工作流"
+      echo "- [.trae/skills/jzt-docs-requirements/SKILL.md](.trae/skills/jzt-docs-requirements/SKILL.md) — 需求梳理与 Confluence 文档工作流"
+      echo ""
+    } >>"$agents_file"
+    echo "  已追加索引: AGENTS.md"
+  fi
+fi
+
+echo "完成。注意: 软链为绝对路径，若目标项目仓库被他人 clone，需在其本机重跑本脚本。"

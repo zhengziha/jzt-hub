@@ -1,0 +1,1 @@
+../../../../my-mcp/confluence-skill/SKILL.md
