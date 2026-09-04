@@ -18,7 +18,8 @@ description: >-
 2. 定位热点       skywalking：接口或链路里确认 DB 耗时占比、找出具体 SQL
 3. 看表结构       jztsql.describe_table 拿 DDL（字段、索引）
 4. 执行计划       jztsql.execute_sql 跑 EXPLAIN
-5. 给出建议       索引 / SQL 改写 / 分页 LIMIT，并说明依据
+5. 数据分布       GROUP BY 统计 WHERE 字段值分布，计算选择性（数据驱动设计索引）
+6. 给出建议       索引 / SQL 改写 / 分页 COUNT 优化，并说明依据
 ```
 
 ## 工具细节（按需读取，不要一次全读）
@@ -29,6 +30,7 @@ description: >-
 |---|---|---|
 | `references/skywalking-trace.md` | analyze_endpoint / analyze_trace 返回结构、时间参数 | 第 1~2 步用链路定位时 |
 | `references/jztsql.md` | 只读约束、实例/库默认值、describe_table / execute_sql 参数 | 第 3 步前 |
+| `references/deep-analysis.md` | 多 trace 采样、数据分布统计与索引选择性、MyBatis Plus 分页 COUNT 陷阱、常见陷阱表、分析报告模板 | 第 4~6 步深度分析时（设计联合索引 / COUNT 慢 / 分页慢必读） |
 
 若链接失效，回源路径：`/Users/zhengzihang/Documents/my-mcp/` 下各子项目。
 
@@ -67,12 +69,23 @@ execute_sql(sql_content="EXPLAIN SELECT ...", db_name="saas_clinic")
 
 重点看返回行的 `type`（ALL 全表扫最差）、`key`（实际用的索引）、`rows`（扫描行数）、`Extra`（Using filesort / Using temporary）。
 
-## 第 5 步：优化建议模板
+## 第 5 步：数据分布统计
+
+设计联合索引前，对 WHERE 涉及字段 GROUP BY 统计值分布、计算选择性，**用数据支撑索引设计**：
+
+```text
+execute_sql(sql_content="SELECT status, COUNT(*) FROM t GROUP BY status ORDER BY COUNT(*) DESC")
+```
+
+详细方法（选择性表格、联合索引字段顺序、≥10 个 trace 采样原则、MyBatis Plus 分页 COUNT 陷阱）见 `references/deep-analysis.md`。
+
+## 第 6 步：优化建议模板
 
 1. **索引建议**：`ALTER TABLE x ADD INDEX idx_yyy (col1, col2)` —— 依据：当前 `type=ALL`、`rows=N`，加索引后预期 `ref/range`；遵循最左前缀，等值列在前、范围列在后
 2. **SQL 改写**：`SELECT *` → 明确列；深分页 → 游标/子查询定位；避免函数包索引列、隐式类型转换
-3. **验证方式**：给出建议后用 `execute_sql` 再跑一次 `EXPLAIN` 对比（jztsql 只读，能验证 SELECT）
-4. **落地提示**：加索引等 DDL 需用户在 SQL 平台走变更流程，本工具不执行写操作
+3. **分页 COUNT 优化**：分页插件自动 COUNT 会带入原 SQL 的 JOIN → 自定义 COUNT 去 JOIN（详见 `references/deep-analysis.md` 第 4 节）
+4. **验证方式**：给出建议后用 `execute_sql` 再跑一次 `EXPLAIN` 对比（jztsql 只读，能验证 SELECT）
+5. **落地提示**：加索引等 DDL 需用户在 SQL 平台走变更流程，本工具不执行写操作
 
 ## 硬性约束
 

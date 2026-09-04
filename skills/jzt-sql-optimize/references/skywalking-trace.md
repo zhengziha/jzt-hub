@@ -1,1 +1,1 @@
-../../../../my-mcp/mcp-server-skywalking/skills/skywalking-trace/SKILL.md
+../../../../my-mcp/mcp-server-skywalking/README.md
