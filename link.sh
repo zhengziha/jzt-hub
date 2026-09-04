@@ -14,23 +14,43 @@ set -euo pipefail
 
 HUB_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DIR="$HUB_DIR/skills"
-TARGET="${1:?用法: $0 /path/to/target-project [--agents]}"
+USAGE_IDES="trae | cursor | claude | qoder | all"
+TARGET="${1:?用法: $0 /path/to/target-project <ide...|all> [--agents]，IDE 可选: $USAGE_IDES}"
 TARGET="$(cd "$TARGET" && pwd)"
-AGENTS=0
-[ "${2:-}" = "--agents" ] && AGENTS=1
+shift
 
-# IDE 名称 -> 项目级 skills 目录（按需增删）
-IDE_SKILL_DIRS=(
-  ".trae/skills"     # Trae
-  ".cursor/skills"   # Cursor
-  ".claude/skills"   # Claude Code
-  ".qoder/skills"    # Qoder
-)
+# IDE 简称 -> 项目级 skills 目录（按需增删，需同步修改 ALL_IDES 与 case）
+ALL_IDES=(trae cursor claude qoder)
+ide_to_dir() {
+  case "$1" in
+    trae)   echo ".trae/skills" ;;   # Trae
+    cursor) echo ".cursor/skills" ;; # Cursor
+    claude) echo ".claude/skills" ;; # Claude Code
+    qoder)  echo ".qoder/skills" ;;  # Qoder
+    *)      return 1 ;;
+  esac
+}
+
+AGENTS=0
+SELECTED=()
+for arg in "$@"; do
+  case "$arg" in
+    --agents) AGENTS=1 ;;
+    all)      SELECTED=("${ALL_IDES[@]}") ;;
+    *)
+      ide_to_dir "$arg" >/dev/null || { echo "未知 IDE: ${arg}（可选: ${USAGE_IDES}）" >&2; exit 1; }
+      SELECTED+=("$arg")
+      ;;
+  esac
+done
+
+[ "${#SELECTED[@]}" -gt 0 ] || { echo "错误: 未指定 IDE（可选: ${USAGE_IDES}）" >&2; exit 1; }
 
 echo "目标项目: $TARGET"
 for skill in "$SKILLS_DIR"/*/; do
   name="$(basename "$skill")"
-  for dir in "${IDE_SKILL_DIRS[@]}"; do
+  for ide in "${SELECTED[@]}"; do
+    dir="$(ide_to_dir "$ide")"
     dest_dir="$TARGET/$dir"
     dest="$dest_dir/$name"
     mkdir -p "$dest_dir"
