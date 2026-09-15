@@ -90,7 +90,7 @@ execute_sql(sql_content="SELECT status, COUNT(*) FROM t GROUP BY status ORDER BY
 ## 硬性约束
 
 - **jztsql 只读**：SELECT / EXPLAIN / SHOW 之外的语句会被拒绝，不要尝试；也**不要**把生成的 ALTER/CREATE 拿到该工具执行
-- 生产读库（默认实例 `生产-诊所-读库-ALI`）上跑 EXPLAIN 是安全的，但避免无 LIMIT 的大结果集（上限 20000 行）
+- 生产读库（默认实例 `生产-诊所-读库-ALI`）上跑 EXPLAIN 是安全的，但避免无 LIMIT 的大结果集（`limit_num` 默认 100，上限 20000）
 - 优化前后耗时对比要基于同一时间窗/同一数据量，结论里注明
 
 ## 输出结论格式
@@ -99,3 +99,22 @@ execute_sql(sql_content="SELECT status, COUNT(*) FROM t GROUP BY status ORDER BY
 2. **根因**：EXPLAIN 证据（type/key/rows/Extra）
 3. **建议**：索引 DDL（平台执行）/ SQL 改写 / 验证结果
 4. **风险**：大表加索引的锁表/耗时提示，建议低峰执行
+
+## 经验沉淀（任务结束前执行）
+
+给出结论后、结束任务前，对照以下条件自检，**满足任一则在本 skill 目录的 `lessons.md` 末尾追加一条**：
+
+1. 工具调用报错/被拒，且本文档与 `references/` 均未提到该坑
+2. 按本文档步骤走不通、调整做法后成功 → 记录调整点
+3. 产出了比本文档模板更优的结论结构或分析手法
+4. MCP 实际行为与 `references/` 文档不符（参数、返回结构、默认值）
+
+一切顺利则**不要记录**（避免噪音）。
+
+条目格式（**只追加，不改本文档正文**；正文由人工定期从 lessons 蒸馏更新）：
+
+```markdown
+## 2026-09-04 | 场景一句话
+- 经验：遇到什么坑 / 更好的做法
+- 证据：EXPLAIN 结果 / trace_id / 报错信息 / 代码位置
+```
